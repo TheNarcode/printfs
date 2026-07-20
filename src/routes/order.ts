@@ -6,8 +6,9 @@ import { metadata, orders, files } from "../database/schema";
 import { eq, desc } from "drizzle-orm";
 import { authMiddleware } from "../middlewares/auth";
 import { PrintConfig } from "../types/index";
-import Razorpay from "razorpay";
+import { getZohoAccessToken } from "../services/zohoAuth";
 import shortUniqueId from "short-unique-id";
+import { getUniquePrintPageCount } from "..";
 
 const sui = new shortUniqueId({ dictionary: "alpha_lower", length: 5 });
 
@@ -59,27 +60,60 @@ app.post(
       totalAmount += effectivePages * copies * price;
     }
 
-    totalAmount = totalAmount * 105;
+    totalAmount = Math.round(totalAmount * 105) / 100;
 
-    const razorpay = new Razorpay({
-      key_id: c.env.RAZORPAY_KEY_ID,
-      key_secret: c.env.RAZORPAY_KEY_SECRET,
-    });
+    const amountInRupees = totalAmount.toFixed(2);
+    const accessToken = await getZohoAccessToken(c.env);
 
-    const rp = await razorpay.orders.create({
-      amount: Math.round(totalAmount),
-      currency: "INR",
-      receipt: `print_${Date.now()}`,
-    });
+    const zohoRes = await fetch(
+      `${c.env.ZOHO_PAYMENTS_BASE_URL}/paymentsessions?account_id=${c.env.ZOHO_ACCOUNT_ID}`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Zoho-oauthtoken ${accessToken}`,
+          "Content-Type": "application/json",
+          "X-com-zoho-payments-organizationid": c.env.ZOHO_ACCOUNT_ID,
+        },
+        body: JSON.stringify({
+          amount: amountInRupees,
+          currency: "INR",
+          description: `print order - ${new Date().toISOString()}`,
+        }),
+      },
+    );
+
+    if (!zohoRes.ok) {
+      const errText = await zohoRes.text();
+      console.error("Zoho payment session creation failed:", errText);
+      return c.body(null, 502);
+    }
+
+    const zohoData = (await zohoRes.json()) as {
+      payments_session?: {
+        payments_session_id: string;
+      };
+      payments_session_id?: string;
+      message?: string;
+      [key: string]: unknown;
+    };
+
+    const paymentsSessionId =
+      zohoData.payments_session?.payments_session_id ||
+      zohoData.payments_session_id;
+
+    if (!paymentsSessionId) {
+      console.error("Zoho payment session missing in response:", zohoData);
+      return c.body(null, 502);
+    }
 
     const orderId = sui.rnd();
 
     const batchQueries = [
       database.insert(orders).values({
         id: orderId,
-        amount: totalAmount,
+        amount: Number(amountInRupees),
         email: payload.email!,
-        paymentRequestId: rp.id,
+        paymentRequestId: paymentsSessionId,
       }),
       database
         .insert(files)
@@ -89,7 +123,11 @@ app.post(
     // order must be a transaction
     await database.batch(batchQueries as any);
 
-    return c.json({ ...rp, localOrderId: orderId });
+    return c.json({
+      payments_session_id: paymentsSessionId,
+      localOrderId: orderId,
+      amount: amountInRupees
+    });
   },
 );
 
@@ -113,31 +151,5 @@ app.get("/list", authMiddleware, async (c) => {
   return c.json(result);
 });
 
-function getUniquePrintPageCount(range: string, totalPages: number): number {
-  const trimmed = range.trim().toLowerCase();
-  if (!trimmed) return totalPages;
-
-  const pages = new Set<number>();
-
-  range.split(",").forEach((part) => {
-    part = part.trim();
-
-    if (part.includes("-")) {
-      const [start, end] = part.split("-").map(Number);
-      if (!isNaN(start) && !isNaN(end)) {
-        for (let i = start; i <= end; i++) {
-          pages.add(i);
-        }
-      }
-    } else {
-      const pageNum = Number(part);
-      if (!isNaN(pageNum)) {
-        pages.add(pageNum);
-      }
-    }
-  });
-
-  return pages.size;
-}
 
 export default app;

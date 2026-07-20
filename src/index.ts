@@ -21,8 +21,8 @@ export function getUniquePrintPageCount(
   range: string,
   totalPages: number,
 ): number {
-  const trimmed = range.trim().toLowerCase();
-  if (!trimmed) return totalPages;
+  const trimmed = range?.trim().toLowerCase();
+  if (!trimmed || trimmed === "all") return totalPages;
 
   const pages = new Set<number>();
 
@@ -33,18 +33,20 @@ export function getUniquePrintPageCount(
       const [start, end] = part.split("-").map(Number);
       if (!isNaN(start) && !isNaN(end)) {
         for (let i = start; i <= end; i++) {
-          pages.add(i);
+          if (i >= 1 && i <= totalPages) {
+            pages.add(i);
+          }
         }
       }
     } else {
       const pageNum = Number(part);
-      if (!isNaN(pageNum)) {
+      if (!isNaN(pageNum) && pageNum >= 1 && pageNum <= totalPages) {
         pages.add(pageNum);
       }
     }
   });
 
-  return pages.size;
+  return pages.size || totalPages;
 }
 
 export default app;

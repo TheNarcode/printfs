@@ -131,6 +131,82 @@ app.post(
   },
 );
 
+app.post(
+  "/pay-session",
+  authMiddleware,
+  zValidator("json", z.object({ orderId: z.string() })),
+  async (c) => {
+    const database = db(c.env.PRINTFDB);
+    const { orderId } = c.req.valid("json");
+    const payload = c.get("payload");
+
+    const order = await database.query.orders.findFirst({
+      where: eq(orders.id, orderId),
+    });
+
+    if (!order || order.email !== payload.email) {
+      return c.body(null, 404);
+    }
+
+    if (order.paid) {
+      return c.json({ error: "Order is already paid" }, 400);
+    }
+
+    const amountInRupees = order.amount.toFixed(2);
+    const accessToken = await getZohoAccessToken(c.env);
+
+    const zohoRes = await fetch(
+      `${c.env.ZOHO_PAYMENTS_BASE_URL}/paymentsessions?account_id=${c.env.ZOHO_ACCOUNT_ID}`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Zoho-oauthtoken ${accessToken}`,
+          "Content-Type": "application/json",
+          "X-com-zoho-payments-organizationid": c.env.ZOHO_ACCOUNT_ID,
+        },
+        body: JSON.stringify({
+          amount: amountInRupees,
+          currency: "INR",
+          description: `print order ${orderId} - ${new Date().toISOString()}`,
+        }),
+      },
+    );
+
+    if (!zohoRes.ok) {
+      const errText = await zohoRes.text();
+      console.error("Zoho payment session creation failed:", errText);
+      return c.body(null, 502);
+    }
+
+    const zohoData = (await zohoRes.json()) as {
+      payments_session?: {
+        payments_session_id: string;
+      };
+      payments_session_id?: string;
+    };
+
+    const paymentsSessionId =
+      zohoData.payments_session?.payments_session_id ||
+      zohoData.payments_session_id;
+
+    if (!paymentsSessionId) {
+      console.error("Zoho payment session missing in response:", zohoData);
+      return c.body(null, 502);
+    }
+
+    await database
+      .update(orders)
+      .set({ paymentRequestId: paymentsSessionId })
+      .where(eq(orders.id, orderId));
+
+    return c.json({
+      payments_session_id: paymentsSessionId,
+      localOrderId: orderId,
+      amount: amountInRupees,
+    });
+  },
+);
+
 app.get("/list", authMiddleware, async (c) => {
   const payload = c.get("payload");
   const database = db(c.env.PRINTFDB);

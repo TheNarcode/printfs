@@ -4,8 +4,11 @@ import uploadRouter from "./routes/file.js";
 import webhookRouter from "./routes/webhook.js";
 import notificationRouter from "./routes/notification.js";
 import clientRouter from "./routes/client.js";
+import { cors } from 'hono/cors'
 
 const app = new Hono<{ Bindings: Env }>();
+
+app.use('*', cors());
 
 app.route("/order", orderRouter);
 app.route("/file", uploadRouter);

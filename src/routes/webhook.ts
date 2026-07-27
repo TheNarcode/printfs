@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import db from "../database/index";
-import { asc, eq, inArray } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { orders, files, fcmTokens } from "../database/schema";
 import { getMessaging } from "firebase-admin/messaging";
 import { zValidator } from "@hono/zod-validator";

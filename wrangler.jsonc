@@ -29,6 +29,14 @@
 			"bucket_name": "printf",
 		},
 	],
+	"queues": {
+		"producers": [
+			{
+				"queue": "printf-queue",
+				"binding": "printf_queue"
+			}
+		]
+	},
 	"secrets": {
 		"required": [
 			"FIREBASE_CLIENT_EMAIL",

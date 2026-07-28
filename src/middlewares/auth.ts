@@ -1,6 +1,5 @@
 import { createMiddleware } from "hono/factory";
 import { oAuthClient } from "../services/googleAuth";
-import type { TokenPayload } from "google-auth-library";
 import { initializeApp, getApps, cert } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 

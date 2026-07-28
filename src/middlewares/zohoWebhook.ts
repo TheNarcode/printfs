@@ -1,6 +1,5 @@
 import { createMiddleware } from "hono/factory";
 
-
 export const zohoWebhookMiddleware = createMiddleware<{
   Bindings: Env;
   Variables: { rawBody: string };

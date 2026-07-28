@@ -37,7 +37,7 @@ app.post("/create", authMiddleware, async (c) => {
       pdfPages[0].drawText(c.get("payload").email, {
         x: 10,
         y: 10,
-        size: 10,
+        size: 5,
         font: font,
       });
 

@@ -13,82 +13,90 @@ const app = new Hono<{ Bindings: Env }>();
 
 app.use("*", checkClientMiddleware);
 
-app.get("/stats", async (c) => {
-  const monthParam = c.req.query("month");
-  const database = db(c.env.PRINTFDB);
-  const allFiles = await database.query.files.findMany({
-    with: {
-      metadata: true,
-      order: true,
-    },
-  });
+app.get(
+  "/stats",
+  zValidator(
+    "query",
+    z.object({
+      month: z.enum(["current", "past", "three", "all"]).optional(),
+    })
+  ),
+  async (c) => {
+    const { month: monthParam } = c.req.valid("query");
+    const database = db(c.env.PRINTFDB);
+    const allFiles = await database.query.files.findMany({
+      with: {
+        metadata: true,
+        order: true,
+      },
+    });
 
-  const stats = {
-    "b/w single sided": { prints: 0, pages: 0 },
-    "b/w double sided": { prints: 0, pages: 0 },
-    "color single sided": { prints: 0, pages: 0 },
-    "color double sided": { prints: 0, pages: 0 },
-  };
+    const stats = {
+      "b/w single sided": { prints: 0, pages: 0 },
+      "b/w double sided": { prints: 0, pages: 0 },
+      "color single sided": { prints: 0, pages: 0 },
+      "color double sided": { prints: 0, pages: 0 },
+    };
 
-  for (const file of allFiles) {
-    if (!file.order?.paid) continue;
+    for (const file of allFiles) {
+      if (!file.order?.paid) continue;
 
-    if (monthParam && file.order?.createdAt) {
-      const date = new Date(file.order.createdAt);
-      if (!isNaN(date.getTime())) {
-        const monthNum = date.getMonth() + 1;
-        const yearNum = date.getFullYear();
-        const monthStrPadded = monthNum.toString().padStart(2, "0");
-        const yyyyMm = `${yearNum}-${monthStrPadded}`;
-        const monthNameLower = date
-          .toLocaleString("en-US", { month: "long" })
-          .toLowerCase();
-        const monthShortLower = date
-          .toLocaleString("en-US", { month: "short" })
-          .toLowerCase();
+      if (monthParam && monthParam !== "all" && file.order?.createdAt) {
+        const date = new Date(file.order.createdAt);
+        if (!isNaN(date.getTime())) {
+          const now = new Date();
+          const fileYear = date.getFullYear();
+          const fileMonth = date.getMonth();
 
-        const paramClean = monthParam.trim().toLowerCase();
-        const paramAsNum = parseInt(paramClean, 10);
+          const currentYear = now.getFullYear();
+          const currentMonth = now.getMonth();
 
-        const matches =
-          yyyyMm === paramClean ||
-          monthNum.toString() === paramClean ||
-          monthStrPadded === paramClean ||
-          paramAsNum === monthNum ||
-          monthNameLower === paramClean ||
-          monthShortLower === paramClean ||
-          `${monthNameLower} ${yearNum}` === paramClean ||
-          `${monthShortLower} ${yearNum}` === paramClean;
+          let matches = false;
 
-        if (!matches) {
-          continue;
+          if (monthParam === "current") {
+            matches = fileYear === currentYear && fileMonth === currentMonth;
+          } else if (monthParam === "past") {
+            let expectedYear = currentYear;
+            let expectedMonth = currentMonth - 1;
+            if (expectedMonth < 0) {
+              expectedMonth = 11;
+              expectedYear -= 1;
+            }
+            matches = fileYear === expectedYear && fileMonth === expectedMonth;
+          } else if (monthParam === "three") {
+            const monthDiff = (currentYear - fileYear) * 12 + (currentMonth - fileMonth);
+            matches = monthDiff >= 0 && monthDiff < 3;
+          }
+
+          if (!matches) {
+            continue;
+          }
         }
       }
+
+      const isColor = file.color?.toLowerCase() === "color";
+      const isSingleSided = file.sides === "one-sided";
+
+      let groupKey: keyof typeof stats;
+      if (isColor) {
+        groupKey = isSingleSided ? "color single sided" : "color double sided";
+      } else {
+        groupKey = isSingleSided ? "b/w single sided" : "b/w double sided";
+      }
+
+      const metaPages = file.metadata?.pages || 1;
+      const pageCount = getUniquePrintPageCount(file.pageRanges || "", metaPages);
+      const copies = parseInt(file.copies) || 1;
+      const numberUp = parseInt(file.numberUp) || 1;
+      const effectivePages = Math.ceil(pageCount / numberUp);
+
+      const group = stats[groupKey];
+      group.prints += 1;
+      group.pages += effectivePages * copies;
     }
 
-    const isColor = file.color?.toLowerCase() === "color";
-    const isSingleSided = file.sides === "one-sided";
-
-    let groupKey: keyof typeof stats;
-    if (isColor) {
-      groupKey = isSingleSided ? "color single sided" : "color double sided";
-    } else {
-      groupKey = isSingleSided ? "b/w single sided" : "b/w double sided";
-    }
-
-    const metaPages = file.metadata?.pages || 1;
-    const pageCount = getUniquePrintPageCount(file.pageRanges || "", metaPages);
-    const copies = parseInt(file.copies) || 1;
-    const numberUp = parseInt(file.numberUp) || 1;
-    const effectivePages = Math.ceil(pageCount / numberUp);
-
-    const group = stats[groupKey];
-    group.prints += 1;
-    group.pages += effectivePages * copies;
-  }
-
-  return c.json(stats);
-});
+    return c.json(stats);
+  });
 
 app.post(
   "/collect",

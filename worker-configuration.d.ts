@@ -4,6 +4,7 @@
 interface __BaseEnv_Env {
 	PRINTFBUCKET: R2Bucket;
 	PRINTFDB: D1Database;
+	printf_queue: Queue;
 	FIREBASE_CLIENT_EMAIL: string;
 	FIREBASE_PRIVATE_KEY: string;
 	FIREBASE_PROJECT_ID: string;

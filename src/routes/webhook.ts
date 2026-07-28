@@ -14,10 +14,6 @@ const app = new Hono<{ Bindings: Env }>();
 
 app.post(`/payment`, zohoWebhookMiddleware, async (c) => {
   const database = db(c.env.PRINTFDB);
-  const redis = new Redis({
-    url: c.env.REDIS_URL,
-    token: c.env.REDIS_TOKEN,
-  });
 
   const payload = JSON.parse(c.get("rawBody"));
 
@@ -62,7 +58,7 @@ app.post(`/payment`, zohoWebhookMiddleware, async (c) => {
 
   await Promise.all([
     database.update(orders).set({ paid: true }).where(eq(orders.id, order.id)),
-    redis.lpush("printf_queue", JSON.stringify(order.files)),
+    await c.env.printf_queue.send(order.files)
   ]);
 
   return c.json({ ok: true }, 200);

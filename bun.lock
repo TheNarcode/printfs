@@ -7,7 +7,6 @@
       "dependencies": {
         "@hono/zod-validator": "latest",
         "@libsql/client": "latest",
-        "@upstash/redis": "latest",
         "dotenv": "latest",
         "drizzle-orm": "latest",
         "firebase-admin": "latest",

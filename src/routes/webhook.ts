@@ -6,7 +6,6 @@ import { getMessaging } from "firebase-admin/messaging";
 import { zValidator } from "@hono/zod-validator";
 import z from "zod";
 import { initializeApp, getApps, cert } from "firebase-admin/app";
-import { Redis } from "@upstash/redis/cloudflare";
 import { zohoWebhookMiddleware } from "../middlewares/zohoWebhook";
 import { checkClientMiddleware } from "../middlewares/checkClient.js";
 
@@ -58,7 +57,7 @@ app.post(`/payment`, zohoWebhookMiddleware, async (c) => {
 
   await Promise.all([
     database.update(orders).set({ paid: true }).where(eq(orders.id, order.id)),
-    await c.env.printf_queue.send(order.files)
+    c.env.printf_queue.send(order.files)
   ]);
 
   return c.json({ ok: true }, 200);

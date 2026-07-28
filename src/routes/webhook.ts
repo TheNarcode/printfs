@@ -6,35 +6,47 @@ import { getMessaging } from "firebase-admin/messaging";
 import { zValidator } from "@hono/zod-validator";
 import z from "zod";
 import { initializeApp, getApps, cert } from "firebase-admin/app";
-import { razorpayWebhookMiddleware } from "../middlewares/razorpayWebhook";
+import { Redis } from "@upstash/redis/cloudflare";
+import { zohoWebhookMiddleware } from "../middlewares/zohoWebhook";
 import { checkClientMiddleware } from "../middlewares/checkClient.js";
 
 const app = new Hono<{ Bindings: Env }>();
 
-app.post(`/payment`, razorpayWebhookMiddleware, async (c) => {
+app.post(`/payment`, zohoWebhookMiddleware, async (c) => {
   const database = db(c.env.PRINTFDB);
 
   const payload = JSON.parse(c.get("rawBody"));
 
-  if (payload.event !== "order.paid" && payload.event !== "payment.cancelled") {
+  // Only act on payment.succeeded and payment.failed events
+  if (
+    payload.event_type !== "payment.succeeded" &&
+    payload.event_type !== "payment.failed"
+  ) {
     return c.json({ ok: true }, 200);
   }
 
-  const id = (payload.payload?.order?.entity?.id ||
-    payload.payload?.payment?.entity?.order_id) as string | undefined;
+  // The payments_session_id links Zoho's session to our local order
+  const paymentsSessionId = (payload.event_object?.payment?.payments_session_id ||
+    payload.event_object?.payments_session_id) as string | undefined;
 
-  if (!id) return c.json({ ok: true }, 200);
+  if (!paymentsSessionId) {
+    console.warn("Zoho webhook payload missing payments_session_id:", payload);
+    return c.json({ ok: true }, 200);
+  }
 
   const order = await database.query.orders.findFirst({
-    where: eq(orders.paymentRequestId, id),
+    where: eq(orders.paymentRequestId, paymentsSessionId),
     with: {
       files: true,
     },
   });
 
-  if (!order) return c.json({ ok: true }, 200);
+  if (!order) {
+    console.warn(`No local order found for payments_session_id: ${paymentsSessionId}`);
+    return c.json({ ok: true }, 200);
+  }
 
-  if (payload.event === "payment.cancelled") {
+  if (payload.event_type === "payment.failed") {
     await database
       .update(orders)
       .set({ status: 2 })

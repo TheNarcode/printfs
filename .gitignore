@@ -43,3 +43,4 @@ devenv.local.yaml
 .wrangler
 
 .dev.vars
+openapi-zoho

@@ -6,7 +6,6 @@ import { getMessaging } from "firebase-admin/messaging";
 import { zValidator } from "@hono/zod-validator";
 import z from "zod";
 import { initializeApp, getApps, cert } from "firebase-admin/app";
-import { Redis } from "@upstash/redis/cloudflare";
 import { razorpayWebhookMiddleware } from "../middlewares/razorpayWebhook";
 import { checkClientMiddleware } from "../middlewares/checkClient.js";
 
@@ -14,10 +13,6 @@ const app = new Hono<{ Bindings: Env }>();
 
 app.post(`/payment`, razorpayWebhookMiddleware, async (c) => {
   const database = db(c.env.PRINTFDB);
-  const redis = new Redis({
-    url: c.env.REDIS_URL,
-    token: c.env.REDIS_TOKEN,
-  });
 
   const payload = JSON.parse(c.get("rawBody"));
 
@@ -51,7 +46,7 @@ app.post(`/payment`, razorpayWebhookMiddleware, async (c) => {
 
   await Promise.all([
     database.update(orders).set({ paid: true }).where(eq(orders.id, order.id)),
-    redis.lpush("printf_queue", JSON.stringify(order.files)),
+    await c.env.printf_queue.send(order.files)
   ]);
 
   return c.json({ ok: true }, 200);

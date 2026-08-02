@@ -9,6 +9,7 @@ import { PrintConfig } from "../types/index";
 import { getZohoAccessToken } from "../services/zohoAuth";
 import shortUniqueId from "short-unique-id";
 import { getUniquePrintPageCount } from "..";
+import { resolveFooterOption } from "../constants";
 
 const sui = new shortUniqueId({ dictionary: "alpha_lower", length: 5 });
 
@@ -17,13 +18,17 @@ const app = new Hono<{ Bindings: Env }>();
 app.post(
   "/create",
   authMiddleware,
-  zValidator("json", z.array(PrintConfig)),
+  zValidator("json", z.object({
+    files: z.array(PrintConfig),
+    footer: z.boolean().optional(),
+  })),
   async (c) => {
     const database = db(c.env.PRINTFDB);
-    const filesData = c.req.valid("json");
+    const body = c.req.valid("json");
     const payload = c.get("payload");
 
-    if (!filesData || filesData.length === 0) return c.body(null, 400);
+    const filesData = body.files;
+    const requestedFooterOption = body.footer;
 
     const metadataResponses = await Promise.all(
       filesData.map((file) =>
@@ -35,6 +40,11 @@ app.post(
     );
 
     if (metadataResponses.some((m) => !m)) return c.body(null, 400);
+
+    const { footer, extraCost } = resolveFooterOption(
+      payload.email,
+      requestedFooterOption,
+    );
 
     let totalAmount = 0;
 
@@ -59,6 +69,8 @@ app.post(
 
       totalAmount += effectivePages * copies * price;
     }
+
+    totalAmount += extraCost;
 
     totalAmount = Math.round(totalAmount * 105) / 100;
 
@@ -114,6 +126,7 @@ app.post(
         amount: Number(amountInRupees),
         email: payload.email!,
         paymentRequestId: paymentsSessionId,
+        footer,
       }),
       database
         .insert(files)

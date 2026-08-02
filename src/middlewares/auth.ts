@@ -2,6 +2,7 @@ import { createMiddleware } from "hono/factory";
 import { oAuthClient } from "../services/googleAuth";
 import { initializeApp, getApps, cert } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
+import { isAllowedDomain } from "../constants";
 
 export interface UnifiedTokenPayload {
   sub: string;
@@ -61,7 +62,11 @@ const auth = createMiddleware<{
       return c.body(null, 401);
     }
 
-    if (!payload) return c.body(null, 422);
+    if (!payload || !payload.email) return c.body(null, 422);
+
+    if (!isAllowedDomain(payload.email)) {
+      return c.body(null, 403);
+    }
 
     c.set("payload", payload);
     await next();

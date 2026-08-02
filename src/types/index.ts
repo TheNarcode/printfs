@@ -12,6 +12,5 @@ export const PrintConfig = z.object({
   sides: z.string(),
   printScaling: z.string(),
   documentFormat: z.string(),
+  footer: z.boolean().optional(),
 });
-
-export type PrintConfigType = z.infer<typeof PrintConfig>;

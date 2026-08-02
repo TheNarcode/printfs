@@ -32,3 +32,13 @@ export function resolveFooterOption(
 
   return { footer: true, extraCost: 0 };
 }
+
+export function generateQueueTokenId(seq: number = 1, date = new Date()): string {
+  const a = Math.floor(Math.random() * 5) + 1;
+  const xxxx = (seq % 10000).toString().padStart(4, "0");
+  const day = date.getDate().toString().padStart(2, "0");
+  const month = (date.getMonth() + 1).toString().padStart(2, "0");
+  const year = date.getFullYear().toString();
+  const ddmmyyyy = `${day}${month}${year}`;
+  return `${a}${xxxx}-${ddmmyyyy}`;
+}

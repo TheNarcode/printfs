@@ -3,7 +3,7 @@ import { Hono } from "hono";
 import { z } from "zod";
 import db from "../database/index";
 import { metadata, orders, files } from "../database/schema";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, like } from "drizzle-orm";
 import { authMiddleware } from "../middlewares/auth";
 import { PrintConfig } from "../types/index";
 import { getZohoAccessToken } from "../services/zohoAuth";
@@ -116,7 +116,32 @@ app.post(
       return c.body(null, 502);
     }
 
+    const now = new Date();
+    const day = now.getDate().toString().padStart(2, "0");
+    const month = (now.getMonth() + 1).toString().padStart(2, "0");
+    const year = now.getFullYear().toString();
+    const dateStr = `${day}${month}${year}`;
+
+    const latestOrder = await database.query.orders.findFirst({
+      where: like(orders.queueTokenId, `%-${dateStr}`),
+      orderBy: [desc(orders.createdAt)],
+    });
+
+    let nextN = 1;
+    if (latestOrder && latestOrder.queueTokenId) {
+      const parts = latestOrder.queueTokenId.split("-");
+      if (parts[0] && parts[0].length === 5) {
+        const y = parseInt(parts[0][0], 10);
+        const xxxx = parseInt(parts[0].substring(1), 10);
+        if (!isNaN(y) && !isNaN(xxxx)) {
+          const prevN = (xxxx - 1) * 5 + y;
+          nextN = prevN + 1;
+        }
+      }
+    }
+
     const orderId = sui.rnd();
+    const queueTokenId = generateQueueTokenId(nextN, now);
 
     const batchQueries = [
       database.insert(orders).values({
@@ -125,6 +150,7 @@ app.post(
         email: payload.email!,
         paymentRequestId: paymentsSessionId,
         footer,
+        queueTokenId,
       }),
       database
         .insert(files)
@@ -137,6 +163,7 @@ app.post(
     return c.json({
       payments_session_id: paymentsSessionId,
       localOrderId: orderId,
+      queueTokenId,
       amount: amountInRupees
     });
   },

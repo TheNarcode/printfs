@@ -18,5 +18,5 @@ export function generateQueueTokenId(seq: number = 1, date = new Date()): string
   const month = (date.getMonth() + 1).toString().padStart(2, "0");
   const year = date.getFullYear().toString();
   const ddmmyyyy = `${day}${month}${year}`;
-  return `${a}${xxxx}-${ddmmyyyy}`;
+  return `${y}${xxxx}-${ddmmyyyy}`;
 }

@@ -57,7 +57,7 @@ app.post(`/payment`, zohoWebhookMiddleware, async (c) => {
 
   await Promise.all([
     database.update(orders).set({ paid: true }).where(eq(orders.id, order.id)),
-    c.env.printf_queue.send(JSON.stringify(order), { contentType: "json" })
+    c.env.printf_queue.send(order)
   ]);
 
   return c.json({ ok: true }, 200);

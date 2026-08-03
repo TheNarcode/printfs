@@ -9,7 +9,7 @@ import { PrintConfig } from "../types/index";
 import { getZohoAccessToken } from "../services/zohoAuth";
 import shortUniqueId from "short-unique-id";
 import { getUniquePrintPageCount } from "..";
-import { resolveFooterOption } from "../constants";
+import { generateQueueTokenId } from "../constants";
 
 const sui = new shortUniqueId({ dictionary: "alpha_lower", length: 5 });
 
@@ -41,10 +41,8 @@ app.post(
 
     if (metadataResponses.some((m) => !m)) return c.body(null, 400);
 
-    const { footer, extraCost } = resolveFooterOption(
-      payload.email,
-      requestedFooterOption,
-    );
+    const footer = requestedFooterOption !== false;
+    const extraCost = footer ? 0 : 2;
 
     let totalAmount = 0;
 

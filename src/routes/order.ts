@@ -129,20 +129,21 @@ app.post(
       orderBy: [desc(orders.createdAt)],
     });
 
-    let nextSeq = 1;
+    let nextN = 1;
     if (latestOrder && latestOrder.queueTokenId) {
       const parts = latestOrder.queueTokenId.split("-");
       if (parts[0] && parts[0].length === 5) {
-        const prevSeqStr = parts[0].substring(1);
-        const prevSeq = parseInt(prevSeqStr, 10);
-        if (!isNaN(prevSeq)) {
-          nextSeq = prevSeq + 1;
+        const y = parseInt(parts[0][0], 10);
+        const xxxx = parseInt(parts[0].substring(1), 10);
+        if (!isNaN(y) && !isNaN(xxxx)) {
+          const prevN = (xxxx - 1) * 5 + y;
+          nextN = prevN + 1;
         }
       }
     }
 
     const orderId = sui.rnd();
-    const queueTokenId = generateQueueTokenId(nextSeq, now);
+    const queueTokenId = generateQueueTokenId(nextN, now);
 
     const batchQueries = [
       database.insert(orders).values({

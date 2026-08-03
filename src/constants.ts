@@ -11,24 +11,12 @@ export function isAllowedDomain(email: string): boolean {
   return domain === "student.sfit.ac.in" || domain === "sfit.ac.in";
 }
 
-// check this
-export function resolveFooterOption(
-  email: string,
-  userRequestedOption?: boolean
-): { footer: boolean; extraCost: number } {
-  const domain = getDomain(email);
-
-  if (domain === "sfit.ac.in") {
-    return { footer: false, extraCost: 2 };
-  }
-
-  if (domain === "student.sfit.ac.in") {
-    if (!userRequestedOption) {
-      return { footer: false, extraCost: 2 };
-    } else {
-      return { footer: true, extraCost: 0 };
-    }
-  }
-
-  return { footer: true, extraCost: 0 };
+export function generateQueueTokenId(seq: number = 1, date = new Date()): string {
+  const a = Math.floor(Math.random() * 5) + 1;
+  const xxxx = (seq % 10000).toString().padStart(4, "0");
+  const day = date.getDate().toString().padStart(2, "0");
+  const month = (date.getMonth() + 1).toString().padStart(2, "0");
+  const year = date.getFullYear().toString();
+  const ddmmyyyy = `${day}${month}${year}`;
+  return `${a}${xxxx}-${ddmmyyyy}`;
 }

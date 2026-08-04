@@ -190,6 +190,11 @@ app.post(
       return c.json({ error: "Order is already paid" }, 400);
     }
 
+    const ageMs = Date.now() - new Date(order.createdAt).getTime();
+    if (ageMs < 60_000) {
+      return c.json({ error: "Payment verification in progress for fresh orders. Please wait a moment." }, 400);
+    }
+
     const amountInRupees = order.amount.toFixed(2);
     const accessToken = await getZohoAccessToken(c.env);
 

@@ -8,7 +8,9 @@ import { cors } from "hono/cors";
 
 const app = new Hono<{ Bindings: Env }>();
 
-app.use("*", cors()); 
+app.use("*", cors({
+  maxAge: 86400,
+}));
 app.route("/order", orderRouter);
 app.route("/file", uploadRouter);
 app.route("/webhook", webhookRouter);

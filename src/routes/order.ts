@@ -255,9 +255,7 @@ app.get("/list", authMiddleware, async (c) => {
     limit: 50,
     with: {
       files: {
-        with: {
-          metadata: true,
-        },
+        with: { metadata: true },
       },
     },
   });
@@ -265,5 +263,25 @@ app.get("/list", authMiddleware, async (c) => {
   return c.json(result);
 });
 
+app.get("/detail/:id", authMiddleware, async (c) => {
+  const { id } = c.req.param();
+  const payload = c.get("payload");
+  const database = db(c.env.PRINTFDB);
+
+  const order = await database.query.orders.findFirst({
+    where: eq(orders.id, id),
+    with: {
+      files: {
+        with: { metadata: true },
+      },
+    },
+  });
+
+  if (!order || order.email !== payload.email) {
+    return c.body(null, 404);
+  }
+
+  return c.json(order);
+});
 
 export default app;

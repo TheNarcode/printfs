@@ -1,14 +1,8 @@
 import { relations } from "drizzle-orm";
 import { sqliteTable, text, real, integer, index } from "drizzle-orm/sqlite-core";
-import shortUniqueId from "short-unique-id";
-import { generateQueueTokenId } from "../constants";
-
-const sui = new shortUniqueId({ dictionary: "alpha_lower", length: 5 });
 
 export const orders = sqliteTable("orders", {
-  id: text("id")
-    .primaryKey()
-    .$defaultFn(() => sui.rnd()),
+  id: text("id").primaryKey(),
   email: text("email").notNull(),
   amount: real("amount").notNull(),
   paymentRequestId: text("payment_request_id").notNull(),
@@ -16,7 +10,6 @@ export const orders = sqliteTable("orders", {
   status: integer("status").notNull().default(0),
   printerName: text("printer_name"),
   footer: integer("footer", { mode: "boolean" }),
-  queueTokenId: text("queue_token_id").$defaultFn(() => generateQueueTokenId()),
   createdAt: integer("created_at", { mode: "timestamp_ms" })
     .notNull()
     .$defaultFn(() => new Date()),
@@ -51,7 +44,7 @@ export const metadata = sqliteTable("metadata", {
 export const fcmTokens = sqliteTable("fcm_tokens", {
   id: text("id")
     .primaryKey()
-    .$defaultFn(() => sui.rnd()),
+    .$defaultFn(() => crypto.randomUUID()),
   email: text("email").notNull(),
   token: text("token").notNull().unique(),
   createdAt: integer("created_at", { mode: "timestamp_ms" })

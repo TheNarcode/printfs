@@ -7,11 +7,8 @@ import { eq, desc, like } from "drizzle-orm";
 import { authMiddleware } from "../middlewares/auth";
 import { PrintConfig } from "../types/index";
 import { getZohoAccessToken } from "../services/zohoAuth";
-import shortUniqueId from "short-unique-id";
 import { getUniquePrintPageCount } from "..";
 import { generateQueueTokenId } from "../constants";
-
-const sui = new shortUniqueId({ dictionary: "alpha_lower", length: 5 });
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -123,13 +120,13 @@ app.post(
     const dateStr = `${day}${month}${year}`;
 
     const latestOrder = await database.query.orders.findFirst({
-      where: like(orders.queueTokenId, `%-${dateStr}`),
+      where: like(orders.id, `%-${dateStr}`),
       orderBy: [desc(orders.createdAt)],
     });
 
     let nextN = 1;
-    if (latestOrder && latestOrder.queueTokenId) {
-      const parts = latestOrder.queueTokenId.split("-");
+    if (latestOrder && latestOrder.id) {
+      const parts = latestOrder.id.split("-");
       if (parts[0] && parts[0].length === 5) {
         const y = parseInt(parts[0][0], 10);
         const xxxx = parseInt(parts[0].substring(1), 10);
@@ -140,8 +137,7 @@ app.post(
       }
     }
 
-    const orderId = sui.rnd();
-    const queueTokenId = generateQueueTokenId(nextN, now);
+    const orderId = generateQueueTokenId(nextN, now);
 
     const batchQueries = [
       database.insert(orders).values({
@@ -150,7 +146,6 @@ app.post(
         email: payload.email!,
         paymentRequestId: paymentsSessionId,
         footer,
-        queueTokenId,
       }),
       database
         .insert(files)
@@ -163,8 +158,7 @@ app.post(
     return c.json({
       payments_session_id: paymentsSessionId,
       localOrderId: orderId,
-      queueTokenId,
-      amount: amountInRupees
+      amount: amountInRupees,
     });
   },
 );
